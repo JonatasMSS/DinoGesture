@@ -1,3 +1,5 @@
+from steps import PredictFaceCommandStep
+from model.Model import Model
 import argparse
 
 import cv2
@@ -24,6 +26,7 @@ def main() -> None:
         help="Indice da camera usada pelo OpenCV (padrao: 0).",
     )
     args = parser.parse_args()
+    model = Model(r"C:\Users\gears\OneDrive\Desktop\DinoGesture\notebooks\Trainings\RandomForest.pkl")
 
     camera = cv2.VideoCapture(args.camera)
     if not camera.isOpened():
@@ -42,6 +45,7 @@ def main() -> None:
                     MirrorFrameStep(),
                     DetectFaceStep(detector),
                     DrawLandmarksStep(),
+                    PredictFaceCommandStep(model),
                     DisplayFrameStep(),
                 ]
             )

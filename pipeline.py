@@ -6,7 +6,9 @@ from typing import Any
 class FrameContext:
     frame: Any | None = None
     landmarks: Any | None = None
+    features: list[float] | None = None
     should_exit: bool = False
+    prediction: int | None = None
 
 
 class Pipeline:
