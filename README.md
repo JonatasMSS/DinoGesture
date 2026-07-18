@@ -5,31 +5,7 @@ Projeto de reconhecimento de expressões faciais a partir dos **468 landmarks** 
 ## Visão geral
 
 ```text
-Webcam → frames PNG por sessão → Face Mesh → 1.404 features → modelo → predição na tela
-```
-
-Cada landmark possui três coordenadas (`x`, `y`, `z`). Por isso, cada frame válido gera `468 × 3 = 1.404` features numéricas.
-
-Antes de salvar ou enviar as features ao modelo, todos os pontos são centralizados pelo landmark `1` (ponta do nariz). Assim, o nariz fica em `(0, 0, 0)` e o modelo aprende a geometria relativa do rosto, em vez da posição da pessoa na tela.
-
-## Estrutura do projeto
-
-```text
-DinoGesture/
-├── data/
-│   ├── recordings/              # Sessões próprias, organizadas por expressão
-│   ├── collected_landmarks.csv  # Dataset gerado a partir das sessões
-│   ├── collected_landmarks_rejected.csv
-│   ├── archive/                 # Dataset original e scripts de referência
-│   └── TreatedData/             # Dados já tratados para experimentos
-├── model/
-│   └── SVM.py                   # Carregamento e inferência do modelo salvo
-├── notebooks/
-│   ├── Analise.ipynb            # Explorações e tratamento inicial dos dados
-│   ├── data_analisis.ipynb      # Análise estatística do dataset original
-│   └── Trainings/
-│       └── SVM.ipynb            # Treinamento e avaliação do classificador
-├── scripts/
+Webcam → frames PNG por sessão → Face Mesh → 1.404 features → mode
 │   ├── capture_expression.py    # Coleta de uma sessão pela webcam
 │   ├── build_landmarks_csv.py   # Geração do CSV de landmarks
 │   └── script_face.py           # Visualização e extração manual com Face Mesh
@@ -78,7 +54,31 @@ O script percorre todas as sessões, exibe uma barra de progresso e recria os ar
 | Arquivo | Conteúdo |
 | --- | --- |
 | `data/collected_landmarks.csv` | Frames válidos com `label`, `session_id`, `frame_index` e 1.404 coordenadas. |
-| `data/collected_landmarks_rejected.csv` | Frames sem rosto, com múltiplos rostos, ilegíveis ou com quantidade inválida de landmarks. |
+| `data/collected_landmarks_rejected.csv` | Frames sem rosto, com múltlo → predição na tela
+```
+
+Cada landmark possui três coordenadas (`x`, `y`, `z`). Por isso, cada frame válido gera `468 × 3 = 1.404` features numéricas.
+
+Antes de salvar ou enviar as features ao modelo, todos os pontos são centralizados pelo landmark `1` (ponta do nariz). Assim, o nariz fica em `(0, 0, 0)` e o modelo aprende a geometria relativa do rosto, em vez da posição da pessoa na tela.
+
+## Estrutura do projeto
+
+```text
+DinoGesture/
+├── data/
+│   ├── recordings/              # Sessões próprias, organizadas por expressão
+│   ├── collected_landmarks.csv  # Dataset gerado a partir das sessões
+│   ├── collected_landmarks_rejected.csv
+│   ├── archive/                 # Dataset original e scripts de referência
+│   └── TreatedData/             # Dados já tratados para experimentos
+├── model/
+│   └── SVM.py                   # Carregamento e inferência do modelo salvo
+├── notebooks/
+│   ├── Analise.ipynb            # Explorações e tratamento inicial dos dados
+│   ├── data_analisis.ipynb      # Análise estatística do dataset original
+│   └── Trainings/
+│       └── SVM.ipynb            # Treinamento e avaliação do classificador
+├── scripts/iplos rostos, ilegíveis ou com quantidade inválida de landmarks. |
 
 O CSV principal usa este formato:
 
