@@ -7,9 +7,10 @@ from pipeline import FrameContext, Pipeline
 from steps import (
     CaptureFrameStep,
     DetectFaceStep,
+    DinoGameControllerStep,
     DisplayFrameStep,
-    DrawLogicPointsStep,
     DrawLandmarksStep,
+    DrawLogicPointsStep,
     LogicalCommandStep,
     MirrorFrameStep,
 )
@@ -49,38 +50,62 @@ def main() -> None:
         default=0.04,
         help="Aumento mínimo normalizado para sobrancelhas levantadas.",
     )
+    parser.add_argument(
+        "--game-control",
+        action="store_true",
+        help="Ativa o controle do jogo Chrome Dino.",
+    )
     args = parser.parse_args()
 
-    camera = cv2.VideoCapture(args.camera)
-    if not camera.isOpened():
-        raise RuntimeError(f"Nao foi possivel abrir a camera {args.camera}.")
+    camera = None
+    detector = None
+    game_controller = None
 
-    face_mesh = mp.solutions.face_mesh
     try:
-        with face_mesh.FaceMesh(
+        camera = cv2.VideoCapture(args.camera)
+        if not camera.isOpened():
+            raise RuntimeError(f"Nao foi possivel abrir a camera {args.camera}.")
+
+        if args.game_control:
+            from scripts.script_dinogame import open_dino_game
+
+            game_controller = open_dino_game()
+
+        face_mesh = mp.solutions.face_mesh
+        detector = face_mesh.FaceMesh(
             static_image_mode=False,
             max_num_faces=1,
             refine_landmarks=False,
-        ) as detector:
-            steps = [
-                CaptureFrameStep(camera),
-                MirrorFrameStep(),
-                DetectFaceStep(detector),
-                LogicalCommandStep(args.mouth_threshold, args.brow_threshold),
-                DrawLandmarksStep(),
-            ]
-            if args.show_logic_points:
-                steps.append(DrawLogicPointsStep())
-            # PredictFaceCommandStep(model) permanece desativado neste teste lógico.
-            steps.append(DisplayFrameStep())
-            pipeline = Pipeline(steps)
-            while True:
-                context = FrameContext()
-                pipeline.run(context)
-                if context.should_exit:
-                    break
+        )
+
+        steps = [
+            CaptureFrameStep(camera),
+            MirrorFrameStep(),
+            DetectFaceStep(detector),
+            LogicalCommandStep(args.mouth_threshold, args.brow_threshold),
+        ]
+        if game_controller is not None:
+            steps.append(DinoGameControllerStep(game_controller))
+
+        steps.append(DrawLandmarksStep())
+        if args.show_logic_points:
+            steps.append(DrawLogicPointsStep())
+
+        steps.append(DisplayFrameStep())
+        pipeline = Pipeline(steps)
+
+        while True:
+            context = FrameContext()
+            pipeline.run(context)
+            if context.should_exit:
+                break
     finally:
-        camera.release()
+        if game_controller is not None:
+            game_controller.close()
+        if detector is not None:
+            detector.close()
+        if camera is not None:
+            camera.release()
         cv2.destroyAllWindows()
 
 

@@ -172,6 +172,34 @@ class LogicalCommandStep:
         return context
 
 
+class DinoGameControllerStep:
+    def __init__(self, controller: Any) -> None:
+        self.controller = controller
+
+    def process(self, context: FrameContext) -> FrameContext:
+        if context.command is None:
+            self.controller.reset_state()
+            return context
+
+        if context.command == 0:
+            self.controller.update(False, False)
+            return context
+
+        if context.command == 1:
+            self.controller.update(False, True)
+            return context
+
+        if context.command == 2:
+            self.controller.update(True, False)
+            return context
+
+        self.controller.reset_state()
+        raise ValueError(f"Comando inválido: {context.command}")
+
+    def close(self) -> None:
+        self.controller.close()
+
+
 class DrawLandmarksStep:
     def process(self, context: FrameContext) -> FrameContext:
         if context.landmarks:
