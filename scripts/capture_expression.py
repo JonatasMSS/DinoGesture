@@ -70,6 +70,18 @@ def draw_status(frame, text: str, color: tuple[int, int, int]) -> None:
     )
 
 
+def save_png(output: Path, frame) -> None:
+    """Salva um frame PNG, inclusive em caminhos Unicode no Windows."""
+    encoded, buffer = cv2.imencode(".png", frame)
+    if not encoded:
+        raise RuntimeError(f"Não foi possível codificar {output.name} como PNG.")
+
+    try:
+        output.write_bytes(buffer.tobytes())
+    except OSError as error:
+        raise RuntimeError(f"Não foi possível salvar {output.name}: {error}") from error
+
+
 def prompt_label() -> str:
     while True:
         try:
@@ -110,8 +122,7 @@ def capture(camera_index: int, recordings_root: Path = RECORDINGS_ROOT) -> Path 
                 now = time.monotonic()
                 if now >= next_frame_at:
                     output = pending_session / f"frame_{saved_frames + 1:04d}.png"
-                    if not cv2.imwrite(str(output), frame):
-                        raise RuntimeError(f"Não foi possível salvar {output.name}.")
+                    save_png(output, frame)
                     saved_frames += 1
                     next_frame_at += 1 / FPS
                 draw_status(frame, f"Gravando: {saved_frames}/{FRAME_COUNT}", (0, 0, 255))
