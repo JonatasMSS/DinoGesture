@@ -1,5 +1,3 @@
-from steps import PredictFaceCommandStep
-from model.Model import Model
 import argparse
 
 import cv2
@@ -10,9 +8,18 @@ from steps import (
     CaptureFrameStep,
     DetectFaceStep,
     DisplayFrameStep,
+    DrawLogicPointsStep,
     DrawLandmarksStep,
+    LogicalCommandStep,
     MirrorFrameStep,
 )
+
+
+def positive_threshold(value: str) -> float:
+    threshold = float(value)
+    if threshold <= 0:
+        raise argparse.ArgumentTypeError("O limiar deve ser maior que zero.")
+    return threshold
 
 
 def main() -> None:
@@ -25,8 +32,24 @@ def main() -> None:
         default=0,
         help="Indice da camera usada pelo OpenCV (padrao: 0).",
     )
+    parser.add_argument(
+        "--show-logic-points",
+        action="store_true",
+        help="Destaca os pontos usados pelo agente lógico.",
+    )
+    parser.add_argument(
+        "--mouth-threshold",
+        type=positive_threshold,
+        default=0.08,
+        help="Aumento mínimo normalizado para boca aberta.",
+    )
+    parser.add_argument(
+        "--brow-threshold",
+        type=positive_threshold,
+        default=0.04,
+        help="Aumento mínimo normalizado para sobrancelhas levantadas.",
+    )
     args = parser.parse_args()
-    model = Model(r"C:\Users\gears\OneDrive\Desktop\DinoGesture\notebooks\Trainings\RandomForest.pkl")
 
     camera = cv2.VideoCapture(args.camera)
     if not camera.isOpened():
@@ -39,16 +62,18 @@ def main() -> None:
             max_num_faces=1,
             refine_landmarks=False,
         ) as detector:
-            pipeline = Pipeline(
-                [
-                    CaptureFrameStep(camera),
-                    MirrorFrameStep(),
-                    DetectFaceStep(detector),
-                    DrawLandmarksStep(),
-                    PredictFaceCommandStep(model),
-                    DisplayFrameStep(),
-                ]
-            )
+            steps = [
+                CaptureFrameStep(camera),
+                MirrorFrameStep(),
+                DetectFaceStep(detector),
+                LogicalCommandStep(args.mouth_threshold, args.brow_threshold),
+                DrawLandmarksStep(),
+            ]
+            if args.show_logic_points:
+                steps.append(DrawLogicPointsStep())
+            # PredictFaceCommandStep(model) permanece desativado neste teste lógico.
+            steps.append(DisplayFrameStep())
+            pipeline = Pipeline(steps)
             while True:
                 context = FrameContext()
                 pipeline.run(context)

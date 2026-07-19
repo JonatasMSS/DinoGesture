@@ -9,6 +9,9 @@ class FrameContext:
     features: list[float] | None = None
     should_exit: bool = False
     prediction: int | None = None
+    command: int | None = None
+    calibrating: bool = False
+    logic_measurements: dict[str, float] | None = None
 
 
 class Pipeline:
