@@ -11,7 +11,7 @@ Webcam → frames PNG por sessão → Face Mesh → 1.404 features → mode
 │   └── script_face.py           # Visualização e extração manual com Face Mesh
 ├── main.py                      # Aplicação de inferência em tempo real
 ├── pipeline.py                  # Contexto e execução da pipeline
-└── steps.py                     # Etapas de captura, detecção, predição e exibição
+└── steps/                       # Etapas de captura, detecção, predição e exibição
 ```
 
 ## Instalação

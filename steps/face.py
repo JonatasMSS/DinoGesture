@@ -1,33 +1,12 @@
-
 import math
 from statistics import median
 from typing import Any
 
-from scripts.build_landmarks_csv import flatten_landmarks
-from model.Model import Model
-
 import cv2
 
+from model.Model import Model
 from pipeline import FrameContext
-
-
-class CaptureFrameStep:
-    def __init__(self, camera: Any) -> None:
-        self.camera = camera
-
-    def process(self, context: FrameContext) -> FrameContext:
-        success, context.frame = self.camera.read()
-        if not success:
-            raise RuntimeError("Nao foi possivel ler um frame da camera.")
-        return context
-
-
-
-
-class MirrorFrameStep:
-    def process(self, context: FrameContext) -> FrameContext:
-        context.frame = cv2.flip(context.frame, 1)
-        return context
+from scripts.build_landmarks_csv import flatten_landmarks
 
 
 class DetectFaceStep:
@@ -47,11 +26,12 @@ class DetectFaceStep:
             context.features = None
         return context
 
+
 class PredictFaceCommandStep:
-    def __init__(self,model:Model):
+    def __init__(self, model: Model) -> None:
         self.predictor = model
 
-    def process(self,context:FrameContext) -> FrameContext:
+    def process(self, context: FrameContext) -> FrameContext:
         if context.features is not None:
             context.prediction = self.predictor.predict([context.features])[0]
         return context
@@ -66,6 +46,19 @@ RIGHT_EYE_POINTS = (386, 374)
 
 
 class LogicalCommandStep:
+    """Converte landmarks faciais em comandos lógicos.
+
+    Args:
+        mouth_threshold: aumento normalizado mínimo da abertura da boca para
+            emitir o comando 1.
+        brow_threshold: aumento normalizado mínimo exigido em ambas as
+            sobrancelhas para emitir o comando 2.
+        calibration_frames: quantidade de frames neutros usados para calcular
+            a mediana de referência de boca e sobrancelhas.
+        confirmation_frames: quantidade de frames consecutivos necessária para
+            confirmar uma decisão e reduzir oscilações causadas por ruído.
+    """
+
     def __init__(
         self,
         mouth_threshold: float = 0.08,
@@ -122,6 +115,7 @@ class LogicalCommandStep:
         }
 
     def _raw_command(self, measurements: dict[str, float]) -> int:
+        # Calcula o comando lógico com base nas medições e no baseline.
         assert self.baseline is not None
         mouth_delta = measurements["mouth_opening"] - self.baseline["mouth_opening"]
         left_brow_delta = measurements["left_brow_gap"] - self.baseline["left_brow_gap"]
@@ -169,92 +163,4 @@ class LogicalCommandStep:
             self.command = raw_command
         context.calibrating = False
         context.command = self.command
-        return context
-
-
-class DrawLandmarksStep:
-    def process(self, context: FrameContext) -> FrameContext:
-        if context.landmarks:
-            height, width = context.frame.shape[:2]
-            for landmark in context.landmarks:
-                cv2.circle(
-                    context.frame,
-                    (int(landmark.x * width), int(landmark.y * height)),
-                    1,
-                    (0, 255, 0),
-                    -1,
-                )
-        return context
-
-
-class DrawLogicPointsStep:
-    def process(self, context: FrameContext) -> FrameContext:
-        if not context.landmarks or context.frame is None:
-            return context
-
-        height, width = context.frame.shape[:2]
-        groups = (
-            (MOUTH_POINTS, (0, 0, 255)),
-            (EYE_CORNERS + LEFT_EYE_POINTS + RIGHT_EYE_POINTS, (255, 0, 0)),
-            (LEFT_BROW_POINTS + RIGHT_BROW_POINTS, (0, 255, 255)),
-        )
-        for indices, color in groups:
-            for index in indices:
-                landmark = context.landmarks[index]
-                cv2.circle(
-                    context.frame,
-                    (int(landmark.x * width), int(landmark.y * height)),
-                    4,
-                    color,
-                    -1,
-                )
-
-        for start, end in ((13, 14), EYE_CORNERS):
-            first, second = context.landmarks[start], context.landmarks[end]
-            cv2.line(
-                context.frame,
-                (int(first.x * width), int(first.y * height)),
-                (int(second.x * width), int(second.y * height)),
-                (255, 255, 255),
-                1,
-            )
-        if context.logic_measurements:
-            metrics = context.logic_measurements
-            text = (
-                f"Boca Δ {metrics.get('mouth_delta', 0.0):.3f} | "
-                f"Sobrancelhas Δ {metrics.get('left_brow_delta', 0.0):.3f}/"
-                f"{metrics.get('right_brow_delta', 0.0):.3f}"
-            )
-            cv2.putText(
-                context.frame,
-                text,
-                (15, 65),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.55,
-                (255, 255, 255),
-                1,
-            )
-        return context
-
-
-class DisplayFrameStep:
-    def __init__(self, title: str = "Landmarks faciais") -> None:
-        self.title = title
-
-    def process(self, context: FrameContext) -> FrameContext | None:
-        if context.calibrating:
-            text = "Calibrando... mantenha o rosto neutro"
-            color = (0, 255, 255)
-        elif context.command is not None:
-            text = f"Comando: {context.command}"
-            color = (0, 255, 0)
-        else:
-            text = "Sem face detectada"
-            color = (0, 0, 255)
-        cv2.putText(context.frame, text, (15, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
-        cv2.imshow(self.title, context.frame)
-
-        if cv2.waitKey(1) & 0xFF in (ord("q"), 27):
-            context.should_exit = True
-            return None
         return context
