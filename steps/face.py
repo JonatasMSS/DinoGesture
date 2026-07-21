@@ -4,6 +4,7 @@ from typing import Any
 
 import cv2
 
+from logic import KnowledgeDefinition
 from model.Model import Model
 from pipeline import FrameContext
 from scripts.build_landmarks_csv import flatten_landmarks
@@ -45,14 +46,11 @@ LEFT_EYE_POINTS = (159, 145)
 RIGHT_EYE_POINTS = (386, 374)
 
 
-class LogicalCommandStep:
-    """Converte landmarks faciais em comandos lógicos.
+class LogicalAgentStep:
+    """Percebe o rosto e consulta uma base de conhecimento proposicional.
 
     Args:
-        mouth_threshold: aumento normalizado mínimo da abertura da boca para
-            emitir o comando 1.
-        brow_threshold: aumento normalizado mínimo exigido em ambas as
-            sobrancelhas para emitir o comando 2.
+        knowledge: regras e limiares declarativos carregados da KB externa.
         calibration_frames: quantidade de frames neutros usados para calcular
             a mediana de referência de boca e sobrancelhas.
         confirmation_frames: quantidade de frames consecutivos necessária para
@@ -61,19 +59,17 @@ class LogicalCommandStep:
 
     def __init__(
         self,
-        mouth_threshold: float = 0.08,
-        brow_threshold: float = 0.04,
+        knowledge: KnowledgeDefinition,
         calibration_frames: int = 24,
         confirmation_frames: int = 3,
     ) -> None:
-        self.mouth_threshold = mouth_threshold
-        self.brow_threshold = brow_threshold
+        self.knowledge = knowledge
         self.calibration_frames = calibration_frames
         self.confirmation_frames = confirmation_frames
         self.calibration_samples: list[dict[str, float]] = []
         self.baseline: dict[str, float] | None = None
-        self.command = 0
-        self.candidate: int | None = None
+        self.action = "neutro"
+        self.candidate: str | None = None
         self.candidate_frames = 0
 
     @staticmethod
@@ -114,8 +110,8 @@ class LogicalCommandStep:
             for name in self.calibration_samples[0]
         }
 
-    def _raw_command(self, measurements: dict[str, float]) -> int:
-        # Calcula o comando lógico com base nas medições e no baseline.
+    def _percept_facts(self, measurements: dict[str, float]) -> set[str]:
+        """Transforma medidas em fatos que serão enviados à KB com TELL."""
         assert self.baseline is not None
         mouth_delta = measurements["mouth_opening"] - self.baseline["mouth_opening"]
         left_brow_delta = measurements["left_brow_gap"] - self.baseline["left_brow_gap"]
@@ -125,16 +121,25 @@ class LogicalCommandStep:
             left_brow_delta=left_brow_delta,
             right_brow_delta=right_brow_delta,
         )
-        if mouth_delta >= self.mouth_threshold:
-            return 1
-        if left_brow_delta >= self.brow_threshold and right_brow_delta >= self.brow_threshold:
-            return 2
-        return 0
+        facts = {
+            "boca_aberta"
+            if mouth_delta >= self.knowledge.mouth_threshold
+            else "boca_fechada",
+            "sobrancelhas_levantadas"
+            if (
+                left_brow_delta >= self.knowledge.brow_threshold
+                and right_brow_delta >= self.knowledge.brow_threshold
+            )
+            else "sobrancelhas_nao_levantadas",
+        }
+        return facts
 
     def process(self, context: FrameContext) -> FrameContext:
         context.logic_measurements = None
+        context.logic_facts = None
+        context.inferred_action = None
         context.calibrating = self.baseline is None
-        context.command = None
+        context.action = None
         if not context.landmarks:
             self.candidate = None
             self.candidate_frames = 0
@@ -150,17 +155,20 @@ class LogicalCommandStep:
             if len(self.calibration_samples) == self.calibration_frames:
                 self._finish_calibration()
                 context.calibrating = False
-                context.command = self.command
+                context.action = self.action
             return context
 
-        raw_command = self._raw_command(measurements)
-        if raw_command == self.candidate:
+        facts = self._percept_facts(measurements)
+        inferred_action = self.knowledge.infer_action(facts)
+        context.logic_facts = facts
+        context.inferred_action = inferred_action
+        if inferred_action == self.candidate:
             self.candidate_frames += 1
         else:
-            self.candidate = raw_command
+            self.candidate = inferred_action
             self.candidate_frames = 1
         if self.candidate_frames >= self.confirmation_frames:
-            self.command = raw_command
+            self.action = inferred_action
         context.calibrating = False
-        context.command = self.command
+        context.action = self.action
         return context

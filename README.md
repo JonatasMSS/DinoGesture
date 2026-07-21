@@ -1,155 +1,95 @@
 # DinoGesture
 
-Projeto de reconhecimento de expressões faciais a partir dos **468 landmarks** do MediaPipe Face Mesh. O fluxo cobre a coleta de sessões pela webcam, a geração de um dataset tabular, o treinamento de um classificador e a inferência em tempo real.
-
-## Visão geral
+Controle do Chrome Dino por gestos faciais. O modo principal é um **agente
+lógico proposicional**: ele percebe o rosto, registra fatos em uma base de
+conhecimento, infere uma ação e a executa no jogo.
 
 ```text
-Webcam → frames PNG por sessão → Face Mesh → 1.404 features → mode
-│   ├── capture_expression.py    # Coleta de uma sessão pela webcam
-│   ├── build_landmarks_csv.py   # Geração do CSV de landmarks
-│   └── script_face.py           # Visualização e extração manual com Face Mesh
-├── main.py                      # Aplicação de inferência em tempo real
-├── pipeline.py                  # Contexto e execução da pipeline
-└── steps/                       # Etapas de captura, detecção, predição e exibição
+Webcam -> Face Mesh -> medidas normalizadas -> fatos
+                                             |
+                                    TELL -> KB -> inferência -> ASK
+                                             |
+                                      pular | abaixar | neutro
 ```
+
+O projeto também mantém, em `test_model_webcam.py`, um experimento separado
+com Random Forest. Esse experimento é aprendizado de máquina; ele não integra
+o agente lógico que controla o jogo.
 
 ## Instalação
 
-O projeto usa Python `3.12` e [uv](https://docs.astral.sh/uv/).
+O projeto usa Python 3.12 e `uv`.
 
 ```powershell
 uv sync
 ```
 
-## Criando um dataset próprio
+## Executar
 
-### 1. Capture uma expressão
-
-```powershell
-python scripts/capture_expression.py
-```
-
-O coletor abre a webcam, mostra 3 segundos de preparação e então tenta gravar 120 frames em 24 FPS. Ao final, informe o nome da expressão. Uma nova sessão é salva nesta estrutura:
-
-```text
-data/recordings/
-└── sorriso/
-    └── 20260718T143000_a1b2c3d4/
-        ├── frame_0001.png
-        ├── ...
-        └── frame_0120.png
-```
-
-Gravar novamente `sorriso` cria outra subpasta de sessão, sem sobrescrever as anteriores. Pressione `Q` ou `ESC` para cancelar a coleta.
-
-### 2. Converta os frames em landmarks
-
-```powershell
-python scripts/build_landmarks_csv.py
-```
-
-O script percorre todas as sessões, exibe uma barra de progresso e recria os arquivos abaixo:
-
-| Arquivo | Conteúdo |
-| --- | --- |
-| `data/collected_landmarks.csv` | Frames válidos com `label`, `session_id`, `frame_index` e 1.404 coordenadas. |
-| `data/collected_landmarks_rejected.csv` | Frames sem rosto, com múltlo → predição na tela
-```
-
-Cada landmark possui três coordenadas (`x`, `y`, `z`). Por isso, cada frame válido gera `468 × 3 = 1.404` features numéricas.
-
-Antes de salvar ou enviar as features ao modelo, todos os pontos são centralizados pelo landmark `1` (ponta do nariz). Assim, o nariz fica em `(0, 0, 0)` e o modelo aprende a geometria relativa do rosto, em vez da posição da pessoa na tela.
-
-## Estrutura do projeto
-
-```text
-DinoGesture/
-├── data/
-│   ├── recordings/              # Sessões próprias, organizadas por expressão
-│   ├── collected_landmarks.csv  # Dataset gerado a partir das sessões
-│   ├── collected_landmarks_rejected.csv
-│   ├── archive/                 # Dataset original e scripts de referência
-│   └── TreatedData/             # Dados já tratados para experimentos
-├── model/
-│   └── SVM.py                   # Carregamento e inferência do modelo salvo
-├── notebooks/
-│   ├── Analise.ipynb            # Explorações e tratamento inicial dos dados
-│   ├── data_analisis.ipynb      # Análise estatística do dataset original
-│   └── Trainings/
-│       └── SVM.ipynb            # Treinamento e avaliação do classificador
-├── scripts/iplos rostos, ilegíveis ou com quantidade inválida de landmarks. |
-
-O CSV principal usa este formato:
-
-```text
-label,session_id,frame_index,x_0,y_0,z_0,...,x_467,y_467,z_467
-sorriso,20260718T143000_a1b2c3d4,1,...
-```
-
-`label` identifica a expressão. `session_id` identifica uma gravação completa. `frame_index` preserva a ordem do frame, mas não deve ser usado como feature do modelo.
-
-## Treinamento
-
-Os notebooks de treinamento ficam em `notebooks/Trainings/`. O notebook `SVM.ipynb` é o ponto de partida para carregar o CSV, treinar o classificador e salvar o modelo em formato Joblib.
-
-Ao montar os dados para treino, use apenas as colunas de landmarks como entrada:
-
-```python
-feature_columns = [
-    column for column in df.columns
-    if column.startswith(("x_", "y_", "z_"))
-]
-
-X = df[feature_columns]
-y = df["label"]
-groups = df["session_id"]
-```
-
-### Evitando data leakage
-
-Os 120 frames de uma sessão são muito parecidos. Portanto, nunca use `train_test_split` padrão nesses frames: ele pode colocar imagens da mesma sessão em treino e teste.
-
-Separe os dados por `session_id` com `GroupShuffleSplit` ou `StratifiedGroupKFold`. Dessa forma, uma sessão inteira pertence a apenas um conjunto.
-
-```python
-from sklearn.model_selection import GroupShuffleSplit
-
-splitter = GroupShuffleSplit(n_splits=1, test_size=0.3, random_state=42)
-train_index, test_index = next(splitter.split(X, y, groups=groups))
-```
-
-Para uma avaliação confiável, grave pelo menos duas sessões por expressão; cinco ou mais é um objetivo melhor.
-
-## Inferência em tempo real
-
-Após treinar e salvar um modelo compatível com as 1.404 coordenadas centralizadas pelo nariz:
+Visualize a percepção e a ação inferida:
 
 ```powershell
 python main.py
 ```
 
-A pipeline executa as seguintes etapas:
+Controle o Chrome Dino com o rosto:
 
-```text
-CaptureFrameStep
-  → MirrorFrameStep
-  → DetectFaceStep
-  → DrawLandmarksStep
-  → PredictFaceCommandStep
-  → DisplayFrameStep
+```powershell
+python main.py --game-control
 ```
 
-`DetectFaceStep` preserva os landmarks originais para o desenho e produz as features normalizadas para o modelo. A janela mostra a classe prevista quando houver um rosto detectado.
+Para a demonstração, o modo abaixo mostra medidas, fatos enviados por `TELL` e
+a ação respondida por `ASK`:
 
-> O modelo usado em tempo real deve ser treinado com o mesmo formato gerado por `build_landmarks_csv.py`. Misturar dados brutos com dados centralizados pelo nariz torna as previsões inválidas.
+```powershell
+python main.py --game-control --debug-mode
+```
 
-## Tecnologias
+## Base de conhecimento
 
-- Python 3.12
-- OpenCV
-- MediaPipe Face Mesh
-- pandas
-- scikit-learn
-- Joblib
-- tqdm
+As regras e os limiares vivem em `knowledge/dino_rules.json`. Ela é carregada
+e validada antes de abrir a câmera ou o Chrome. Uma KB alternativa pode ser
+usada sem editar o código:
+
+```powershell
+python main.py --game-control --rules caminho\para\regras.json
+```
+
+O formato é JSON nativo:
+
+```json
+{
+  "mouth_threshold": 0.08,
+  "brow_threshold": 0.04,
+  "rules": [
+    {"if": ["boca_aberta"], "then": "acao:abaixar"},
+    {"if": ["boca_fechada", "sobrancelhas_levantadas"], "then": "acao:pular"},
+    {"if": ["boca_fechada", "sobrancelhas_nao_levantadas"], "then": "acao:neutro"}
+  ]
+}
+```
+
+A KB deve inferir exatamente uma ação para cada combinação válida dos fatos de
+percepção. Arquivos ausentes, JSON inválido, ações desconhecidas, regras
+ambíguas ou incompletas interrompem a inicialização com uma mensagem clara.
+
+Leia a descrição completa em [docs/logical_agent_rules.md](docs/logical_agent_rules.md).
+
+## Dataset e modelo experimental
+
+Os scripts em `scripts/` capturam expressões e convertem 468 landmarks em
+1.404 coordenadas para treinamento. Os notebooks fazem a análise e o
+treinamento, separando sessões por `session_id` para evitar *data leakage*.
+
+```powershell
+python scripts/capture_expression.py
+python scripts/build_landmarks_csv.py
+python test_model_webcam.py
+```
+
+## Referência
+
+O desenho do agente segue o modelo de agentes baseados em conhecimento de
+Russell e Norvig: uma base de conhecimento recebe sentenças (`TELL`) e produz
+respostas inferidas a consultas (`ASK`). [Artificial Intelligence: A Modern
+Approach, capítulo 7](https://aima.cs.berkeley.edu/2nd-ed/newchap07.pdf).

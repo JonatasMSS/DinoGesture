@@ -77,6 +77,26 @@ class DrawLandmarksStep:
                 (255, 255, 255),
                 1,
             )
+        if context.logic_facts is not None:
+            facts = ", ".join(sorted(context.logic_facts))
+            cv2.putText(
+                context.frame,
+                f"TELL: {facts}",
+                (15, 90),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.45,
+                (255, 255, 255),
+                1,
+            )
+            cv2.putText(
+                context.frame,
+                f"ASK: {context.inferred_action or '-'}",
+                (15, 110),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.45,
+                (255, 255, 255),
+                1,
+            )
 
 
 class DisplayFrameStep:
@@ -87,8 +107,8 @@ class DisplayFrameStep:
         if context.calibrating:
             text = "Calibrando... mantenha o rosto neutro"
             color = (0, 255, 255)
-        elif context.command is not None:
-            text = f"Comando: {context.command}"
+        elif context.action is not None:
+            text = f"Acao: {context.action}"
             color = (0, 255, 0)
         else:
             text = "Sem face detectada"

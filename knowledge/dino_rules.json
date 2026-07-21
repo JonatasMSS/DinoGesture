@@ -1,0 +1,9 @@
+{
+  "mouth_threshold": 0.08,
+  "brow_threshold": 0.04,
+  "rules": [
+    {"if": ["boca_aberta"], "then": "acao:abaixar"},
+    {"if": ["boca_fechada", "sobrancelhas_levantadas"], "then": "acao:pular"},
+    {"if": ["boca_fechada", "sobrancelhas_nao_levantadas"], "then": "acao:neutro"}
+  ]
+}

@@ -3,6 +3,7 @@ from pathlib import Path
 
 import cv2
 
+from logic import KnowledgeDefinition, load_knowledge
 from pipeline import FrameContext, Pipeline
 from steps import (
     CaptureFrameStep,
@@ -10,17 +11,13 @@ from steps import (
     DinoActionStep,
     DisplayFrameStep,
     DrawLandmarksStep,
-    LogicalCommandStep,
+    LogicalAgentStep,
     MirrorFrameStep,
 )
 from utils.chrome import launch_dino
 
 
-def positive_threshold(value: str) -> float:
-    threshold = float(value)
-    if threshold <= 0:
-        raise argparse.ArgumentTypeError("O limiar deve ser maior que zero.")
-    return threshold
+DEFAULT_RULES_PATH = Path(__file__).resolve().parent / "knowledge" / "dino_rules.json"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -29,8 +26,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--camera", type=int, default=0)
     parser.add_argument("--show-logic-points", action="store_true")
-    parser.add_argument("--mouth-threshold", type=positive_threshold, default=0.08)
-    parser.add_argument("--brow-threshold", type=positive_threshold, default=0.04)
+    parser.add_argument("--rules", type=Path, default=DEFAULT_RULES_PATH)
     parser.add_argument("--game-control", action="store_true")
     parser.add_argument("--debug-mode", action="store_true")
     parser.add_argument("--chrome-path", type=Path)
@@ -42,12 +38,14 @@ def validate_args(args: argparse.Namespace) -> None:
         raise ValueError("--debug-mode requer --game-control.")
 
 
-def build_steps(args: argparse.Namespace, camera, detector) -> list:
+def build_steps(
+    args: argparse.Namespace, camera, detector, knowledge: KnowledgeDefinition
+) -> list:
     steps = [
         CaptureFrameStep(camera),
         MirrorFrameStep(),
         DetectFaceStep(detector),
-        LogicalCommandStep(args.mouth_threshold, args.brow_threshold),
+        LogicalAgentStep(knowledge),
     ]
     if args.game_control:
         steps.append(DinoActionStep(debug_mode=args.debug_mode))
@@ -68,8 +66,10 @@ def main() -> None:
     args = parser.parse_args()
     try:
         validate_args(args)
+        knowledge = load_knowledge(args.rules)
     except ValueError as error:
         parser.error(str(error))
+
 
     if args.game_control:
         launch_dino(args.chrome_path)
@@ -88,7 +88,35 @@ def main() -> None:
             max_num_faces=1,
             refine_landmarks=False,
         ) as detector:
-            pipeline = Pipeline(build_steps(args, camera, detector))
+
+
+            steps = [
+                CaptureFrameStep(camera),
+                MirrorFrameStep(),
+                DetectFaceStep(detector),
+                LogicalAgentStep(knowledge),
+             ]
+            if args.game_control:
+                steps.append(DinoActionStep(debug_mode=args.debug_mode))
+                if args.debug_mode:
+                    steps.extend([DrawLandmarksStep(show_logic_points=True), DisplayFrameStep()])
+            else:
+                steps.extend(
+                    [
+                        DrawLandmarksStep(show_logic_points=args.show_logic_points),
+                        DisplayFrameStep(),
+                    ]
+                )
+
+
+
+
+            pipeline = Pipeline(steps)
+
+
+
+
+
             while True:
                 context = FrameContext()
                 pipeline.run(context)

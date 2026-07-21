@@ -8,6 +8,8 @@ from utils.chrome import focus_chrome_window
 
 VK_SPACE = "space"
 VK_DOWN = "down"
+ACTION_JUMP = "pular"
+ACTION_DUCK = "abaixar"
 
 
 def tap_key(key: str) -> None:
@@ -16,7 +18,7 @@ def tap_key(key: str) -> None:
 
 
 class DinoActionStep:
-    """Converte comandos lógicos em teclas para o Chrome Dino."""
+    """Converte ações inferidas pela KB em teclas para o Chrome Dino."""
 
     def __init__(self, debug_mode: bool = False, clock=monotonic) -> None:
         self.debug_mode = debug_mode
@@ -24,7 +26,7 @@ class DinoActionStep:
         self.ready_at: float | None = None
         self.down_pressed = False
         self.started = False
-        self.last_command: int | None = None
+        self.last_action: str | None = None
         self.ready_announced = False
 
     def _tap(self, key: str) -> None:
@@ -54,7 +56,7 @@ class DinoActionStep:
             self._release_down()
             self.ready_at = None
             self.started = False
-            self.last_command = None
+            self.last_action = None
             self.ready_announced = False
             return context
 
@@ -69,19 +71,19 @@ class DinoActionStep:
             self.ready_announced = True
 
         if not self.started:
-            if context.command == 2:
+            if context.action == ACTION_JUMP:
                 self._tap(VK_SPACE)
                 self.started = True
-                self.last_command = 2
+                self.last_action = ACTION_JUMP
             return context
 
-        if context.command != self.last_command:
-            if context.command == 2:
+        if context.action != self.last_action:
+            if context.action == ACTION_JUMP:
                 self._release_down()
                 self._tap(VK_SPACE)
-            elif context.command == 1:
+            elif context.action == ACTION_DUCK:
                 self._hold_down()
             else:
                 self._release_down()
-            self.last_command = context.command
+            self.last_action = context.action
         return context
