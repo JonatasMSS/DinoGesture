@@ -38,8 +38,10 @@ class PredictFaceCommandStep:
         return context
 
 
+
+#Indices 
 MOUTH_POINTS = (13, 14)
-EYE_CORNERS = (33, 263)
+EYE_CORNERS = (33, 263) 
 LEFT_BROW_POINTS = (70, 63, 105, 66, 107)
 RIGHT_BROW_POINTS = (336, 296, 334, 293, 300)
 LEFT_EYE_POINTS = (159, 145)
@@ -86,6 +88,9 @@ class LogicalAgentStep:
             return None
 
         upper_lip, lower_lip = (landmarks[index] for index in MOUTH_POINTS)
+
+
+
         mouth_opening = math.hypot(
             float(lower_lip.x) - float(upper_lip.x),
             float(lower_lip.y) - float(upper_lip.y),
@@ -162,11 +167,16 @@ class LogicalAgentStep:
         inferred_action = self.knowledge.infer_action(facts)
         context.logic_facts = facts
         context.inferred_action = inferred_action
+
+        # Contagem de confirmação
         if inferred_action == self.candidate:
             self.candidate_frames += 1
         else:
             self.candidate = inferred_action
             self.candidate_frames = 1
+
+
+        
         if self.candidate_frames >= self.confirmation_frames:
             self.action = inferred_action
         context.calibrating = False

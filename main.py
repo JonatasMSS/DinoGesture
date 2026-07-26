@@ -90,28 +90,9 @@ def main() -> None:
         ) as detector:
 
 
-            steps = [
-                CaptureFrameStep(camera),
-                MirrorFrameStep(),
-                DetectFaceStep(detector),
-                LogicalAgentStep(knowledge),
-             ]
-            if args.game_control:
-                steps.append(DinoActionStep(debug_mode=args.debug_mode))
-                if args.debug_mode:
-                    steps.extend([DrawLandmarksStep(show_logic_points=True), DisplayFrameStep()])
-            else:
-                steps.extend(
-                    [
-                        DrawLandmarksStep(show_logic_points=args.show_logic_points),
-                        DisplayFrameStep(),
-                    ]
-                )
-
-
-
-
-            pipeline = Pipeline(steps)
+            pipeline = Pipeline(
+                build_steps(args, camera, detector, knowledge), profile=args.debug_mode
+            )
 
 
 

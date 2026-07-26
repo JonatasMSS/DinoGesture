@@ -114,9 +114,42 @@ class DisplayFrameStep:
             text = "Sem face detectada"
             color = (0, 0, 255)
         cv2.putText(context.frame, text, (15, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
+        self._draw_timings(context)
         cv2.imshow(self.title, context.frame)
 
         if cv2.waitKey(1) & 0xFF in (ord("q"), 27):
             context.should_exit = True
             return None
         return context
+
+    @staticmethod
+    def _draw_timings(context: FrameContext) -> None:
+        if (
+            context.debug_previous_step_ms is None
+            or context.debug_previous_frame_ms is None
+            or context.debug_previous_average_step_ms is None
+            or context.debug_previous_average_frame_ms is None
+        ):
+            return
+        height = context.frame.shape[0]
+        lines = ["Tempos do frame anterior (ultimo | media):"]
+        lines.extend(
+            f"{name.removesuffix('Step')}: {duration:.1f} | "
+            f"{context.debug_previous_average_step_ms[name]:.1f} ms"
+            for name, duration in context.debug_previous_step_ms.items()
+        )
+        lines.append(
+            f"Total: {context.debug_previous_frame_ms:.1f} | "
+            f"{context.debug_previous_average_frame_ms:.1f} ms"
+        )
+        start_y = height - 15 - 18 * (len(lines) - 1)
+        for index, line in enumerate(lines):
+            cv2.putText(
+                context.frame,
+                line,
+                (15, start_y + 18 * index),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.45,
+                (255, 255, 255),
+                1,
+            )
