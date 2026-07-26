@@ -1,4 +1,4 @@
-# Agente lógico proposicional do DinoGesture
+# Agente lógico proposicional do DinoExpression
 
 ## Classificação
 
