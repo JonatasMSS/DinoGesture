@@ -22,6 +22,12 @@ The decision is made from declarative rules stored in JSON—not an opaque model
 | Closed mouth + raised eyebrows | `boca_fechada` + `sobrancelhas_levantadas` | Jump |
 | Closed mouth + neutral eyebrows | `boca_fechada` + `sobrancelhas_nao_levantadas` | Neutral |
 
+
+## Results
+
+<img width="800" height="450" alt="GERJALKJSD-ezgif com-video-to-gif-converter" src="https://github.com/user-attachments/assets/2bb44bf9-ae2c-41ba-b0e1-994f9ada78c4" />
+
+
 ## How it works
 
 Every webcam frame goes through perception, normalization, inference, and actuation.
